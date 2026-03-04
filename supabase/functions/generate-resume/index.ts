@@ -3,7 +3,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// @ts-expect-error - Deno is available in Supabase Edge Functions natively
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
@@ -21,7 +20,6 @@ Deno.serve(async (req: Request) => {
        })
     }
 
-    // @ts-expect-error - Deno is available in Supabase Edge Functions natively
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
     if (!GEMINI_API_KEY) {
       // Return error payload directly
@@ -35,22 +33,30 @@ Deno.serve(async (req: Request) => {
 Your task is to take a candidate's Master Resume text and a specific Job Description, and output a tailored resume.
 Align the candidate's skills and experience with the job requirements. Keep it professional and concise.
 
+CRITICAL CONSTRAINTS:
+1. PRESERVE ALL ORIGINAL BULLET POINTS: Every single responsibility and achievement from the Master Resume must remain in the tailored version.
+2. NO DELETIONS: Do not remove any bullet points or experiences.
+3. NO ADDITIONS: Do not add any new experiences or responsibilities that are not in the Master Resume.
+4. NO FAKE METRICS: Do not invent or add any quantifiable metrics (like percentages or dollar amounts) that are not present in the original text.
+5. IDENTICAL STRUCTURE: The number of bullet points for each job must remain exactly the same as the original.
+6. WORDING OPTIMIZATION ONLY: You may only rephrase or optimize the existing wording of the bullet points to better align with the keywords and skills requested in the Job Description.
+
 You MUST return the output strictly as a JSON object with this exact structure (do not output markdown blocks or any other text):
 {
   "name": "Candidate Name",
   "email": "email@example.com",
   "phone": "Phone Number",
   "summary": "A fully rewritten professional summary targeting the ${jobTitle} role at ${company}, using 3-4 sentences.",
-  "skills": ["Skill1", "Skill2", "Skill3"], // Max 15 highly relevant skills
+  "skills": ["Skill1", "Skill2", "Skill3"], // Max 15 highly relevant skills from the Master Resume
   "experience": [
     {
       "title": "Job Title",
       "company": "Company Name",
       "duration": "Start Date - End Date",
       "description": [
-        "Bullet point 1 highlighting achievements relevant to JD.",
-        "Bullet point 2 highlighting achievements relevant to JD.",
-        "Bullet point 3"
+        "Optimized bullet point 1 (maintaining original meaning and intent).",
+        "Optimized bullet point 2.",
+        "Optimized bullet point 3."
       ]
     }
   ],

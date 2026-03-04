@@ -4,7 +4,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("Missing Supabase environment variables. AI generation will fail.");
+  console.warn("Missing Supabase environment variables. AI generation and Auth will fail.");
 }
 
 export const supabase = createClient(
