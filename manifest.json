@@ -1,15 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "AI Resume Tailor",
+  "name": "ApplyAI",
   "version": "1.0.0",
-  "description": "Tailor your resume to any LinkedIn job posting",
+  "description": "Land your dream role faster by tailoring your resume to any LinkedIn job posting seamlessly.",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "sidePanel"
   ],
   "action": {
-    "default_popup": "index.html",
-    "default_title": "AI Resume Tailor"
+    "default_title": "Open ApplyAI Side Panel"
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "background": {
+    "service_worker": "src/background.ts"
   },
   "content_scripts": [
     {

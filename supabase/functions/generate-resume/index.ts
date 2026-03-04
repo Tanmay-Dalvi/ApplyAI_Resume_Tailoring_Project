@@ -40,6 +40,7 @@ CRITICAL CONSTRAINTS:
 4. NO FAKE METRICS: Do not invent or add any quantifiable metrics (like percentages or dollar amounts) that are not present in the original text.
 5. IDENTICAL STRUCTURE: The number of bullet points for each job must remain exactly the same as the original.
 6. WORDING OPTIMIZATION ONLY: You may only rephrase or optimize the existing wording of the bullet points to better align with the keywords and skills requested in the Job Description.
+7. DO NOT HALLUCINATE PAST JOBS: Never add the target Job Title or target Company to the candidate's work experience. The candidate has not worked there yet.
 
 You MUST return the output strictly as a JSON object with this exact structure (do not output markdown blocks or any other text):
 {
@@ -50,8 +51,8 @@ You MUST return the output strictly as a JSON object with this exact structure (
   "skills": ["Skill1", "Skill2", "Skill3"], // Max 15 highly relevant skills from the Master Resume
   "experience": [
     {
-      "title": "Job Title",
-      "company": "Company Name",
+      "title": "[Candidate's Past Job Title]",
+      "company": "[Candidate's Past Company]",
       "duration": "Start Date - End Date",
       "description": [
         "Optimized bullet point 1 (maintaining original meaning and intent).",

@@ -4,6 +4,12 @@ export interface JobData {
   description: string;
 }
 
+export interface EligibilityScore {
+  score: number;
+  remark: string;
+  missingSkills: string[];
+}
+
 export interface ResumeData {
   name: string;
   email: string;
