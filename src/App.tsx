@@ -30,11 +30,13 @@ function App() {
     supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       setSession(session);
       setIsAuthLoading(false);
+      chrome.storage.local.set({ userLoggedIn: !!session });
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setSession(session);
+      chrome.storage.local.set({ userLoggedIn: !!session });
     });
 
     return () => subscription.unsubscribe();

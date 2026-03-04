@@ -34,22 +34,29 @@ function scrapeLinkedInJob(): ScrapedJobData | null {
   };
 }
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'scrapeJob') {
+chrome.storage.local.get(['userLoggedIn'], (result) => {
+  if (!result.userLoggedIn) {
+    console.log("LinkedIn Scraper: User not logged in. Scraping disabled.");
+    return;
+  }
+
+  chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+    if (request.action === 'scrapeJob') {
+      const jobData = scrapeLinkedInJob();
+      sendResponse({ success: true, data: jobData });
+    }
+    return true;
+  });
+
+  const observer = new MutationObserver(() => {
     const jobData = scrapeLinkedInJob();
-    sendResponse({ success: true, data: jobData });
-  }
-  return true;
-});
+    if (jobData && jobData.title) {
+      chrome.storage.local.set({ lastScrapedJob: jobData });
+    }
+  });
 
-const observer = new MutationObserver(() => {
-  const jobData = scrapeLinkedInJob();
-  if (jobData && jobData.title) {
-    chrome.storage.local.set({ lastScrapedJob: jobData });
-  }
-});
-
-observer.observe(document.body, {
-  childList: true,
-  subtree: true,
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
 });
