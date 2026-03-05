@@ -1,5 +1,6 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+// @ts-nocheck
+// Supabase Edge Function — runs in the Deno runtime.
+// This file is excluded from ESLint and TypeScript project config.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,9 +19,9 @@ Deno.serve(async (req) => {
       throw new Error('Resume text and job description are required')
     }
 
-    const API_KEY = Deno.env.get('GEMINI_API_KEY')
+    const API_KEY = Deno.env.get('OPENROUTER_API_KEY')
     if (!API_KEY) {
-      throw new Error('GEMINI_API_KEY is not set')
+      throw new Error('OPENROUTER_API_KEY is not set')
     }
 
     const systemPrompt = `You are an expert technical recruiter and resume evaluator. 
@@ -32,12 +33,12 @@ CRITICAL CONSTRAINTS:
 3. Provide a brief 1-2 sentence remark explaining the score.
 4. List up to 5 critical skills or requirements they are missing.
 
-You MUST return the output strictly as a JSON object with this exact structure (do not output markdown blocks or any other text):
+Return ONLY a raw JSON object. No markdown, no code blocks. Use this exact structure:
 {
   "score": 85,
   "remark": "Strong fit for the Python backend requirements, but lacks the requested AWS cloud experience.",
   "missingSkills": ["AWS deployment", "Docker"]
-}`
+}`;
 
     const userPrompt = `
 JOB TITLE: ${jobTitle}
@@ -48,39 +49,41 @@ ${jobDescription}
 
 CANDIDATE'S MASTER RESUME:
 ${resumeText}
-`
+`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`, {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ parts: [{ text: userPrompt }] }],
-        generationConfig: {
-            temperature: 0.2,
-            response_mime_type: "application/json",
-        }
+        model: "openrouter/auto",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ]
       })
     })
 
     if (!response.ok) {
-         const errorText = await response.text();
-         throw new Error(`Gemini API Error: ${response.status} - ${errorText}`);
+      const errorText = await response.text();
+      throw new Error(`OpenRouter API Error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json()
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text
+    const rawText = data.choices[0].message.content
 
     if (!rawText) {
-      throw new Error('No content returned from Gemini')
+      throw new Error('No content returned from AI')
     }
 
     let parsedResult;
     try {
-        parsedResult = JSON.parse(rawText.replace(/```json\n?|\n?```/g, '').trim());
-    } catch (e) {
-        console.error("Failed to parse AI response as JSON:", rawText);
-        throw new Error("AI returned invalid JSON format.");
+      parsedResult = JSON.parse(rawText.replace(/```json\n?|\n?```/g, '').trim());
+    } catch {
+      console.error("Failed to parse AI response as JSON:", rawText);
+      throw new Error("AI returned invalid JSON format.");
     }
 
     return new Response(
@@ -89,9 +92,10 @@ ${resumeText}
     )
 
   } catch (error) {
-    console.error("Calculate Score Error:", error.message);
+    const errorMsg = error instanceof Error ? error.message : "Internal Error";
+    console.error("Calculate Score Error:", errorMsg);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMsg }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }

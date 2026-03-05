@@ -18,6 +18,8 @@ export interface ResumeData {
   skills: string[];
   experience: Experience[];
   education: Education[];
+  // Dynamic extra sections — projects, achievements, languages, etc.
+  extra_sections?: ExtraSection[];
 }
 
 export interface Experience {
@@ -31,4 +33,17 @@ export interface Education {
   degree: string;
   institution: string;
   year: string;
+}
+
+// A flexible section that can hold any extra content
+export interface ExtraSection {
+  title: string;                 // e.g. "Projects", "Achievements", "Languages"
+  items: ExtraSectionItem[];
+}
+
+export interface ExtraSectionItem {
+  heading?: string;              // Optional item heading (e.g. project name)
+  subheading?: string;           // Optional sub-info (e.g. tech stack, role)
+  bullets?: string[];            // Bullet points for the item
+  plain?: string;                // Or just a plain text line (for languages, etc.)
 }

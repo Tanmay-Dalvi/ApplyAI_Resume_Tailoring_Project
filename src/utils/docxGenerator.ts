@@ -3,17 +3,74 @@ import { saveAs } from 'file-saver';
 import { ResumeData } from '../types';
 
 export async function generateDocx(resume: ResumeData, jobTitle: string): Promise<void> {
+  const sectionBorderBottom = {
+    bottom: { color: "000000", space: 1, style: BorderStyle.SINGLE, size: 6 },
+  };
+
+  const sectionHeading = (title: string) =>
+    new Paragraph({
+      text: title,
+      heading: HeadingLevel.HEADING_1,
+      border: sectionBorderBottom,
+      spacing: { before: 200, after: 100 },
+    });
+
+  // Build extra sections paragraphs dynamically
+  const extraSectionParagraphs: Paragraph[] = [];
+  if (resume.extra_sections && resume.extra_sections.length > 0) {
+    for (const section of resume.extra_sections) {
+      extraSectionParagraphs.push(sectionHeading(section.title.toUpperCase()));
+
+      for (const item of section.items) {
+        // If has heading/subheading (e.g. a project)
+        if (item.heading) {
+          extraSectionParagraphs.push(
+            new Paragraph({
+              spacing: { before: 100, after: 40 },
+              children: [
+                new TextRun({ text: item.heading, bold: true }),
+                ...(item.subheading ? [new TextRun({ text: `  |  ${item.subheading}`, italics: true })] : []),
+              ],
+            })
+          );
+        }
+        // Bullet points
+        if (item.bullets && item.bullets.length > 0) {
+          for (const bullet of item.bullets) {
+            extraSectionParagraphs.push(
+              new Paragraph({
+                text: `•  ${bullet}`,
+                indent: { left: 360, hanging: 360 },
+                alignment: AlignmentType.JUSTIFIED,
+                spacing: { after: 80 },
+              })
+            );
+          }
+        }
+        // Plain text line (e.g. language: "English - Native")
+        if (item.plain) {
+          extraSectionParagraphs.push(
+            new Paragraph({
+              spacing: { after: 80 },
+              children: [new TextRun({ text: `•  ${item.plain}` })],
+            })
+          );
+        }
+      }
+    }
+  }
+
   const doc = new Document({
     styles: {
       default: {
         document: {
           run: {
             font: "Times New Roman",
-            size: 22, // 11pt font size
-            color: "000000", // Black
+            size: 22, // 11pt
+            color: "000000",
           },
           paragraph: {
-            spacing: { line: 240 }, // 1.0 spacing
+            spacing: { line: 240 },
           },
         },
       },
@@ -23,10 +80,10 @@ export async function generateDocx(resume: ResumeData, jobTitle: string): Promis
         properties: {
           page: {
             margin: {
-              top: 720,    // 0.5 inch
-              right: 720,  // 0.5 inch
-              bottom: 720, // 0.5 inch
-              left: 720,   // 0.5 inch
+              top: 720,
+              right: 720,
+              bottom: 720,
+              left: 720,
             },
           },
         },
@@ -39,7 +96,7 @@ export async function generateDocx(resume: ResumeData, jobTitle: string): Promis
               new TextRun({
                 text: resume.name.toUpperCase(),
                 bold: true,
-                size: 32, // 16pt
+                size: 32,
               }),
             ],
           }),
@@ -53,90 +110,51 @@ export async function generateDocx(resume: ResumeData, jobTitle: string): Promis
             ],
           }),
 
-          // Professional Summary Section
-          new Paragraph({
-            text: 'PROFESSIONAL SUMMARY',
-            heading: HeadingLevel.HEADING_1,
-            border: {
-              bottom: { color: "000000", space: 1, style: BorderStyle.SINGLE, size: 6 },
-            },
-            spacing: { before: 200, after: 100 },
-          }),
+          // Professional Summary
+          sectionHeading('PROFESSIONAL SUMMARY'),
           new Paragraph({
             alignment: AlignmentType.JUSTIFIED,
             spacing: { after: 200 },
             children: [new TextRun(resume.summary)],
           }),
 
-          // Skills Section
-          new Paragraph({
-            text: 'SKILLS',
-            heading: HeadingLevel.HEADING_1,
-            border: {
-              bottom: { color: "000000", space: 1, style: BorderStyle.SINGLE, size: 6 },
-            },
-            spacing: { before: 200, after: 100 },
-          }),
+          // Skills
+          sectionHeading('SKILLS'),
           new Paragraph({
             spacing: { after: 200 },
             children: [new TextRun(resume.skills.join('  •  '))],
           }),
 
-          // Experience Section
-          new Paragraph({
-            text: 'EXPERIENCE',
-            heading: HeadingLevel.HEADING_1,
-            border: {
-              bottom: { color: "000000", space: 1, style: BorderStyle.SINGLE, size: 6 },
-            },
-            spacing: { before: 200, after: 100 },
-          }),
-
+          // Experience
+          sectionHeading('EXPERIENCE'),
           ...resume.experience.flatMap(exp => [
-            // Company and Location/Dates line (tab stops to align dates right)
             new Paragraph({
-              tabStops: [
-                { type: TabStopType.RIGHT, position: 10000 },
-              ],
+              tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
               spacing: { before: 100, after: 50 },
               children: [
                 new TextRun({ text: exp.company, bold: true }),
                 new TextRun({ text: `\t${exp.duration}`, bold: true }),
               ],
             }),
-            // Job Title line
             new Paragraph({
               spacing: { after: 100 },
-              children: [
-                new TextRun({ text: exp.title, italics: true }),
-              ],
+              children: [new TextRun({ text: exp.title, italics: true })],
             }),
-            // Bullets
             ...exp.description.map(desc =>
               new Paragraph({
                 text: `•  ${desc}`,
-                indent: { left: 360, hanging: 360 }, // 0.25 inch hanging indent
+                indent: { left: 360, hanging: 360 },
                 alignment: AlignmentType.JUSTIFIED,
                 spacing: { after: 100 },
               })
             ),
           ]),
 
-          // Education Section
-          new Paragraph({
-            text: 'EDUCATION',
-            heading: HeadingLevel.HEADING_1,
-            border: {
-              bottom: { color: "000000", space: 1, style: BorderStyle.SINGLE, size: 6 },
-            },
-            spacing: { before: 200, after: 100 },
-          }),
-
+          // Education
+          sectionHeading('EDUCATION'),
           ...resume.education.map(edu =>
             new Paragraph({
-              tabStops: [
-                { type: TabStopType.RIGHT, position: 10000 },
-              ],
+              tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
               spacing: { before: 100, after: 100 },
               children: [
                 new TextRun({ text: edu.institution, bold: true }),
@@ -145,12 +163,15 @@ export async function generateDocx(resume: ResumeData, jobTitle: string): Promis
               ],
             })
           ),
+
+          // Extra Sections (Projects, Achievements, Languages, etc.)
+          ...extraSectionParagraphs,
         ],
       },
     ],
   });
 
   const blob = await Packer.toBlob(doc);
-  const fileName = `Tailored_Resume_${jobTitle.replace(/\s+/g, '_')}.docx`;
+  const fileName = `ApplyAI_Resume_${jobTitle.replace(/\s+/g, '_')}.docx`;
   saveAs(blob, fileName);
 }

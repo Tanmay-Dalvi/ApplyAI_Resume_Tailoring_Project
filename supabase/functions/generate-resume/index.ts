@@ -1,10 +1,13 @@
+// @ts-nocheck
+// Supabase Edge Function — runs in the Deno runtime.
+// This file is excluded from ESLint and TypeScript project config.
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-Deno.serve(async (req: Request) => {
-  // Handle CORS preflight request
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -12,53 +15,48 @@ Deno.serve(async (req: Request) => {
   try {
     const { resumeText, jobDescription, jobTitle, company } = await req.json()
 
-    // Required fields check
     if (!resumeText || !jobDescription) {
        return new Response(JSON.stringify({ error: 'Missing resumeText or jobDescription' }), {
          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-         status: 200 // Return 200 to prevent Supabase frontend SDK from throwing generic error
+         status: 200
        })
     }
 
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-    if (!GEMINI_API_KEY) {
-      // Return error payload directly
-      return new Response(JSON.stringify({ error: "GEMINI_API_KEY is missing from Supabase environment variables! Please set it using: npx supabase secrets set GEMINI_API_KEY=your_key" }), {
+    const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY')
+    if (!OPENROUTER_API_KEY) {
+      return new Response(JSON.stringify({ error: "OPENROUTER_API_KEY is missing from Supabase environment variables!" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200, 
+        status: 200,
       })
     }
 
-    const systemPrompt = `You are an expert technical recruiter and resume writer. 
+    const systemPrompt = `You are an expert technical recruiter and resume writer.
 Your task is to take a candidate's Master Resume text and a specific Job Description, and output a tailored resume.
 Align the candidate's skills and experience with the job requirements. Keep it professional and concise.
 
 CRITICAL CONSTRAINTS:
-1. PRESERVE ALL ORIGINAL BULLET POINTS: Every single responsibility and achievement from the Master Resume must remain in the tailored version.
-2. NO DELETIONS: Do not remove any bullet points or experiences.
-3. NO ADDITIONS: Do not add any new experiences or responsibilities that are not in the Master Resume.
-4. NO FAKE METRICS: Do not invent or add any quantifiable metrics (like percentages or dollar amounts) that are not present in the original text.
+1. PRESERVE ALL ORIGINAL BULLET POINTS: Every single responsibility, achievement, project, and item from the Master Resume must appear in the tailored version.
+2. NO DELETIONS: Do not remove any bullet points, experiences, projects, or any other section.
+3. NO ADDITIONS: Do not add new experiences or items that are not in the Master Resume.
+4. NO FAKE METRICS: Do not invent or add quantifiable metrics not present in the original text.
 5. IDENTICAL STRUCTURE: The number of bullet points for each job must remain exactly the same as the original.
-6. WORDING OPTIMIZATION ONLY: You may only rephrase or optimize the existing wording of the bullet points to better align with the keywords and skills requested in the Job Description.
-7. DO NOT HALLUCINATE PAST JOBS: Never add the target Job Title or target Company to the candidate's work experience. The candidate has not worked there yet.
+6. WORDING OPTIMIZATION ONLY: Rephrase existing wording to better align with keywords from the Job Description.
+7. DO NOT HALLUCINATE PAST JOBS: Never add the target Job Title or target Company to work experience.
+8. CAPTURE ALL EXTRA SECTIONS: The Master Resume may contain additional sections beyond experience and education, such as Projects, Achievements, Certifications, Languages, Hobbies, Volunteering, etc. You MUST include ALL of them under "extra_sections". Each item can have "heading" (string), "subheading" (string), "bullets" (array of strings), or "plain" (string) fields. If none exist, return an empty array.
 
-You MUST return the output strictly as a JSON object with this exact structure (do not output markdown blocks or any other text):
+Return ONLY a raw JSON object. No markdown, no code blocks, no extra text. Use this exact structure:
 {
   "name": "Candidate Name",
   "email": "email@example.com",
   "phone": "Phone Number",
-  "summary": "A fully rewritten professional summary targeting the ${jobTitle} role at ${company}, using 3-4 sentences.",
-  "skills": ["Skill1", "Skill2", "Skill3"], // Max 15 highly relevant skills from the Master Resume
+  "summary": "3-4 sentence professional summary targeting the ${jobTitle} role at ${company}.",
+  "skills": ["Skill1", "Skill2", "Skill3"],
   "experience": [
     {
-      "title": "[Candidate's Past Job Title]",
-      "company": "[Candidate's Past Company]",
+      "title": "Past Job Title",
+      "company": "Past Company",
       "duration": "Start Date - End Date",
-      "description": [
-        "Optimized bullet point 1 (maintaining original meaning and intent).",
-        "Optimized bullet point 2.",
-        "Optimized bullet point 3."
-      ]
+      "description": ["Optimized bullet 1.", "Optimized bullet 2."]
     }
   ],
   "education": [
@@ -67,8 +65,32 @@ You MUST return the output strictly as a JSON object with this exact structure (
       "institution": "University/College",
       "year": "Graduation Year"
     }
+  ],
+  "extra_sections": [
+    {
+      "title": "Projects",
+      "items": [
+        {
+          "heading": "Project Name",
+          "subheading": "Tech Stack",
+          "bullets": ["Point 1.", "Point 2."]
+        }
+      ]
+    },
+    {
+      "title": "Achievements",
+      "items": [
+        { "plain": "Won XYZ award in 2023." }
+      ]
+    },
+    {
+      "title": "Languages",
+      "items": [
+        { "plain": "English - Native" }
+      ]
+    }
   ]
-}`
+}`;
 
     const userPrompt = `
 Job Title: ${jobTitle}
@@ -79,59 +101,39 @@ ${jobDescription}
 
 Candidate's Master Resume:
 ${resumeText}
-`
+`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: systemPrompt },
-              { text: userPrompt }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.3,
-          responseMimeType: "application/json" // Force strict JSON output
-        }
+        model: "openrouter/auto",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ]
       })
     })
 
     const data = await response.json()
 
     if (!response.ok) {
-      console.error("Gemini API Error:", data)
-      // Return Gemini's error
-      const apiErrorMsg = data?.error?.message || "Failed to generate content from Gemini API";
-      return new Response(JSON.stringify({ error: "Gemini API failed: " + apiErrorMsg }), {
+      console.error("OpenRouter API Error:", data)
+      const apiErrorMsg = data?.error?.message || "Failed to generate content from OpenRouter API";
+      return new Response(JSON.stringify({ error: "OpenRouter API failed: " + apiErrorMsg }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200, 
+        status: 200,
       })
     }
 
-    let generatedText = data.candidates[0].content.parts[0].text
-    
-    // Gemini sometimes wraps the JSON in markdown code blocks even with the correct mime type.
-    // Strip ```json at the beginning and ``` at the end.
-    if (generatedText.startsWith('```json')) {
-      generatedText = generatedText.substring(7);
-    }
-    if (generatedText.startsWith('```')) {
-      generatedText = generatedText.substring(3);
-    }
-    if (generatedText.endsWith('```')) {
-      generatedText = generatedText.substring(0, generatedText.length - 3);
-    }
-    
-    generatedText = generatedText.trim();
-    
-    // Parse the returned JSON text to ensure it's valid
+    let generatedText = data.choices[0].message.content
+
+    // Strip markdown code fences if present
+    generatedText = generatedText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+
     try {
       const parsedResume = JSON.parse(generatedText)
       return new Response(JSON.stringify(parsedResume), {
@@ -139,18 +141,18 @@ ${resumeText}
         status: 200,
       })
     } catch {
-      return new Response(JSON.stringify({ error: "Failed to parse Gemini output as JSON. Output was: " + generatedText }), {
+      return new Response(JSON.stringify({ error: "Failed to parse API output as JSON. Output: " + generatedText.substring(0, 200) }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200, 
+        status: 200,
       })
     }
 
-  } catch (error: unknown) {
+  } catch (error) {
     console.error("Edge Function Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown internal error occurred";
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200, // Returning 200 instead of 400/500 to bypass generic "Non-2xx" messages by the SDK
+      status: 200,
     })
   }
 })
