@@ -335,8 +335,5 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 <div align="center">
 
-**Made with ❤️ by [Tanmay Dalvi](https://github.com/Tanmay-Dalvi)**
-
-_If this project helped you land a job, drop a ⭐ on the repo!_
 
 </div>
